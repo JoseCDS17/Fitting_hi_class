@@ -1,0 +1,11 @@
+# Old notebooks and data, kept only locally
+archive/
+
+# Computed spectra and templates (regenerate with scripts/compute_spectra.py)
+data/
+
+# Python environment and build artifacts
+hiclass_env/
+__pycache__/
+*.egg-info/
+.ipynb_checkpoints/

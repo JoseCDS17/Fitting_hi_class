@@ -1,0 +1,5 @@
+[submodule "hi_class_public"]
+	path = hi_class_public
+	url = https://github.com/miguelzuma/hi_class_public.git
+	branch = hi_class
+	ignore = dirty

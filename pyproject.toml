@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hiclass_tools"
+version = "0.1.0"
+description = "Compute, fit and plot hi_class power-spectrum deviations in Horndeski models"
+requires-python = ">=3.10"
+dependencies = ["numpy", "scipy", "matplotlib", "lmfit"]
+
+[tool.setuptools]
+packages = ["hiclass_tools"]
