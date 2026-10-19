@@ -18,12 +18,14 @@ import numpy as np
 from hiclass_tools.spectra import SpectraSet, spectra_path
 
 # ===================== Configuration =====================
-NAME = 'fit_LCDM'
+NAME = 'range_DE_grid'
 PARAMETRIZATION = 'propto_omega'      # 'propto_omega' | 'dust'
 
-BACKGROUNDS = [(-1.0, 0.0)]           # list of (w0, wa)
+# Grid of (w0, wa), keeping w0 + wa <= 0
+BACKGROUNDS = [(w0, wa) for w0 in np.linspace(-1, -0.8, 5) for wa in np.linspace(-1, 0, 5)
+               if w0 + wa <= 0]
 
-k = np.logspace(-3, 1, 100)           # h/Mpc
+k = np.logspace(-3, 1, 50)            # h/Mpc
 cK = np.logspace(3, 6, 10)
 cB = np.linspace(0.5, 1.5, 10)
 

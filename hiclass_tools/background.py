@@ -3,6 +3,7 @@
 Time variable N = ln(a). Densities are normalised so that H(N=0) = 1,
 i.e. every H is in units of H0.
 """
+import concurrent.futures
 from dataclasses import dataclass
 
 import numpy as np
@@ -61,3 +62,24 @@ class Background:
 
     def w_eff(self, N):
         return (W_M * self.rho_m(N) + self.wDE(N) * self.rho_DE(N)) / (self.rho_m(N) + self.rho_DE(N))
+
+
+def _from_class_worker(w0, wa, cosmo):
+    try:
+        return w0, wa, Background.from_class(w0, wa, cosmo), None
+    except Exception as e:
+        return w0, wa, None, str(e).strip().splitlines()[-1] if str(e).strip() else type(e).__name__
+
+
+def backgrounds_from_class(pairs, cosmo=None, workers=None):
+    """Background.from_class for many (w0, wa) in parallel -> {(w0, wa): Background}. Failures are reported and skipped."""
+    out = {}
+    with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(_from_class_worker, w0, wa, cosmo) for w0, wa in pairs]
+        for future in concurrent.futures.as_completed(futures):
+            w0, wa, bg, error = future.result()
+            if error is None:
+                out[(w0, wa)] = bg
+            else:
+                print(f"Background failed for w0={w0:.3g}, wa={wa:.3g}: {error}")
+    return out
