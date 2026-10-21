@@ -138,6 +138,18 @@ def mean_fit(x, values, sigma):
     return MeanFit(mean, std / np.sqrt(len(x)), x, values, sigma, std / abs(mean))
 
 
+def weighted_mean_fit(x, values, sigma):
+    """Inverse-variance weighted mean: points with huge errors (degenerate fits) barely weigh."""
+    x, values, sigma = _clean(x, values, sigma)
+    if len(x) == 0:
+        raise ValueError("No valid points for the mean")
+
+    w = 1 / sigma**2
+    mean = np.average(values, weights=w)
+    std = np.sqrt(np.average((values - mean)**2, weights=w))
+    return MeanFit(mean, np.sqrt(1 / np.sum(w)), x, values, sigma, std / abs(mean))
+
+
 ''' Step 1: single spectrum '''
 @dataclass
 class SpectrumFit:
@@ -405,7 +417,7 @@ def fit_global_template(sets, k_min=None, k_max=None, method='leastsq', verbose=
     """Fit the tanh_kB_L model on every spectrum of every background and build a GlobalTemplate.
 
     A and s: weighted linear fits in cB using the spectra of all backgrounds at once (degenerate
-    spectrum fits have huge errors, so they barely weigh). L: mean over the spectra of each
+    spectrum fits have huge errors, so they barely weigh). L: weighted mean over the spectra of each
     background, then L = l1 (1 + w0) + l2 wa by least squares.
     """
     gf = GlobalFit(sets)
@@ -426,7 +438,7 @@ def fit_global_template(sets, k_min=None, k_max=None, method='leastsq', verbose=
 
     for key, bg_fits in gf.spectrum_fits.items():
         Ls = [f.params['L'] for f in bg_fits.values()]
-        gf.L_means[key] = mean_fit([f.cb for f in bg_fits.values()], [v for v, _ in Ls], [e for _, e in Ls])
+        gf.L_means[key] = weighted_mean_fit([f.cb for f in bg_fits.values()], [v for v, _ in Ls], [e for _, e in Ls])
 
     keys = list(gf.L_means)
     X = np.array([[1 + w0, wa] for w0, wa in keys])
