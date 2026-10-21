@@ -30,6 +30,11 @@ def tanh_kB(k, kB, kJ, a, b, s):
     return a * np.tanh(2 * np.log10(s * k / kB)) + b
 
 
+def tanh_kB_L(k, kB, kJ, A, L, s):
+    """tanh_kB written as large-scale level L (k << kB) plus a step of height 2A (a = A, b = L + A)."""
+    return L + A * (np.tanh(2 * np.log10(s * k / kB)) + 1)
+
+
 @dataclass(frozen=True)
 class TemplateModel:
     name: str
@@ -54,11 +59,21 @@ MODELS = {m.name: m for m in [
                   lambda y, cb: dict(a=y.max() / 2, b=y.max() / 2, s=1 / cb),
                   r'a \tanh\left[2\log_{10}(s\,k/k_B)\right] + b',
                   positive=('s',), needs_kJ=False, bounds={'s': (1e-10, np.inf)}),
+    TemplateModel('tanh_kB_L', tanh_kB_L, ('A', 'L', 's'),
+                  lambda y, cb: dict(A=(y[-1] - y[0]) / 2, L=y[0], s=1 / cb),
+                  r'L + A \left(\tanh\left[2\log_{10}(s\,k/k_B)\right] + 1\right)',
+                  positive=('s',), needs_kJ=False, bounds={'s': (1e-10, np.inf)}),
 ]}
 
 
 def get_model(model):
     return MODELS[model] if isinstance(model, str) else model
+
+
+def r_squared(y, y_fit):
+    """Fraction of the variance of y explained by y_fit."""
+    ss_tot = np.sum((y - np.mean(y))**2)
+    return 1 - np.sum((y - y_fit)**2) / ss_tot if ss_tot > 0 else np.nan
 
 
 def relative_error(y, y_fit):
@@ -77,7 +92,7 @@ def _clean(x, values, sigma):
 
 @dataclass
 class LinearFit:
-    """Weighted linear fit p = m x + y0 (covariance scaled by chi2_red, as np.polyfit)."""
+    """Weighted linear fit p = m x + y0 (parameter errors as np.polyfit, scaled by the residuals)."""
     m: float
     m_err: float
     y0: float
@@ -85,7 +100,7 @@ class LinearFit:
     x: np.ndarray             # data used in the fit
     values: np.ndarray
     sigma: np.ndarray
-    chi2_red: float
+    r2: float                 # fraction of the variance of `values` explained by the line
 
     def __call__(self, x):
         return self.m * x + self.y0
@@ -97,9 +112,8 @@ def linear_fit(x, values, sigma):
         raise ValueError(f"Need at least 2 valid points for a linear fit, got {len(x)}")
 
     (m, y0), cov = np.polyfit(x, values, 1, w=1 / sigma, cov=True if len(x) > 3 else 'unscaled')
-    dof = len(x) - 2
-    chi2_red = np.sum(((values - (m * x + y0)) / sigma)**2) / dof if dof > 0 else np.nan
-    return LinearFit(m, np.sqrt(abs(cov[0, 0])), y0, np.sqrt(abs(cov[1, 1])), x, values, sigma, chi2_red)
+    return LinearFit(m, np.sqrt(abs(cov[0, 0])), y0, np.sqrt(abs(cov[1, 1])), x, values, sigma,
+                     r_squared(values, m * x + y0))
 
 
 @dataclass
@@ -109,8 +123,8 @@ class MeanFit:
     error: float
     x: np.ndarray             # data used in the mean
     values: np.ndarray
-    sigma: np.ndarray         # error bars of each point (only for plotting and chi2_red)
-    chi2_red: float           # >> 1 means the points are not compatible with a constant
+    sigma: np.ndarray         # error bars of each point (only for plotting)
+    rel_scatter: float        # std / |mean| of the points: how far they are from a constant
 
 
 def mean_fit(x, values, sigma):
@@ -120,9 +134,8 @@ def mean_fit(x, values, sigma):
 
     mean = np.mean(values)
     dof = len(x) - 1
-    error = np.std(values, ddof=1) / np.sqrt(len(x)) if dof > 0 else np.nan
-    chi2_red = np.sum(((values - mean) / sigma)**2) / dof if dof > 0 else np.nan
-    return MeanFit(mean, error, x, values, sigma, chi2_red)
+    std = np.std(values, ddof=1) if dof > 0 else np.nan
+    return MeanFit(mean, std / np.sqrt(len(x)), x, values, sigma, std / abs(mean))
 
 
 ''' Step 1: single spectrum '''
@@ -158,6 +171,20 @@ def fit_spectrum(spectra, ck, cb, model, k_min=None, k_max=None, method='leastsq
 
 
 ''' Final template '''
+def template_errors(template, spectra, k_min=None, k_max=None):
+    """{(ck, cb): relative error} of template(k, ck, cb, background) against a SpectraSet in [k_min, k_max]."""
+    k = spectra.k
+    mask = (k >= (k_min if k_min is not None else k[0])) & (k <= (k_max if k_max is not None else k[-1]))
+    out = {}
+    for ck, cb in spectra.pk_mg:
+        try:
+            y = spectra.deviation(ck, cb)[mask]
+            out[(ck, cb)] = relative_error(y, template(k[mask], ck, cb, spectra.background))
+        except ValueError:
+            out[(ck, cb)] = np.nan
+    return out
+
+
 @dataclass
 class Template:
     model_name: str
@@ -192,15 +219,9 @@ class Template:
 
         return model(np.asarray(k), kB, kJ, **params)
 
-    def errors(self, spectra):
-        """{(ck, cb): relative error} of the template against a SpectraSet (full k range)."""
-        out = {}
-        for ck, cb in spectra.pk_mg:
-            try:
-                out[(ck, cb)] = relative_error(spectra.deviation(ck, cb), self(spectra.k, ck, cb, spectra.background))
-            except ValueError:
-                out[(ck, cb)] = np.nan
-        return out
+    def errors(self, spectra, k_min=None, k_max=None):
+        """{(ck, cb): relative error} of the template against a SpectraSet in [k_min, k_max] (default: full k range)."""
+        return template_errors(self, spectra, k_min, k_max)
 
     def save(self, name):
         (DATA_DIR / 'templates').mkdir(parents=True, exist_ok=True)
@@ -238,9 +259,9 @@ class TemplateFit:
         """Mean relative error of the individual spectrum fits."""
         return np.nanmean([f.err for f in self.spectrum_fits.values()])
 
-    def mean_chi2_red(self, param):
-        """Mean chi2_red over ck of the linear cB fit of `param`."""
-        return np.nanmean([fits[param].chi2_red for fits in self.cb_fits.values() if param in fits])
+    def mean_r2(self, param):
+        """Mean R^2 over ck of the linear cB fit of `param`."""
+        return np.nanmean([fits[param].r2 for fits in self.cb_fits.values() if param in fits])
 
 
 def fit_template(spectra, model='tanh_kBkJ', k_min=None, k_max=None, method='leastsq',
@@ -301,3 +322,119 @@ def fit_backgrounds(sets, verbose=False, **fit_kwargs):
         except Exception as e:
             print(f"[w0={w0:.2f}, wa={wa:.2f}] fit failed: {type(e).__name__}: {e}")
     return fits
+
+
+''' Global template over backgrounds (model tanh_kB_L) '''
+@dataclass
+class GlobalTemplate:
+    """y = L + A [tanh(2 log10(s k / kB)) + 1] with 6 coefficients valid for any (w0, wa):
+        A = m_A cB + y0_A,   s = m_s cB + y0_s,   L = l1 (1 + w0) + l2 wa  (L = 0 in LCDM)
+    """
+    A: dict                   # {'m': (value, error), 'y0': (value, error)}
+    s: dict                   # {'m': (value, error), 'y0': (value, error)}
+    L: dict                   # {'l1': (value, error), 'l2': (value, error)}
+    parametrization: str
+    model_name: str = 'tanh_kB_L'
+
+    @property
+    def model(self):
+        return MODELS[self.model_name]
+
+    def params(self, cb, background):
+        """Template parameters (A, L, s) at cb for a background."""
+        return {'A': self.A['m'][0] * cb + self.A['y0'][0],
+                'L': self.L['l1'][0] * (1 + background.w0) + self.L['l2'][0] * background.wa,
+                's': self.s['m'][0] * cb + self.s['y0'][0]}
+
+    def __call__(self, k, ck, cb, background):
+        """Predicted P_MG/P_GR - 1 at k [h/Mpc] for (ck, cb) on a background."""
+        params = self.params(cb, background)
+        if params['s'] <= 0:
+            raise ValueError(f"s must be positive, but s={params['s']:.4g} for cb={cb}")
+        kB = Horndeski(ck, cb, background, self.parametrization).kB()
+        return self.model(np.asarray(k), kB, None, **params)
+
+    def errors(self, spectra, k_min=None, k_max=None):
+        """{(ck, cb): relative error} against a SpectraSet in [k_min, k_max] (default: full k range)."""
+        return template_errors(self, spectra, k_min, k_max)
+
+    def save(self, name):
+        (DATA_DIR / 'templates').mkdir(parents=True, exist_ok=True)
+        with open(DATA_DIR / 'templates' / f'{name}.pkl', 'wb') as f:
+            pickle.dump(self.__dict__, f)
+
+    @classmethod
+    def load(cls, name):
+        with open(DATA_DIR / 'templates' / f'{name}.pkl', 'rb') as f:
+            return cls(**pickle.load(f))
+
+
+@dataclass
+class GlobalFit:
+    sets: dict                                             # {(w0, wa): SpectraSet}
+    spectrum_fits: dict = field(default_factory=dict)      # (w0, wa) -> {(ck, cb): SpectrumFit}
+    failed: dict = field(default_factory=dict)             # (w0, wa, ck, cb) -> message
+    A_fit: LinearFit = None                                # A vs cB, all spectra of all backgrounds
+    s_fit: LinearFit = None                                # s vs cB, all spectra of all backgrounds
+    L_means: dict = field(default_factory=dict)            # (w0, wa) -> MeanFit of L over its spectra
+    L_coeffs: dict = field(default_factory=dict)           # {'l1': (value, error), 'l2': (value, error)}
+    L_r2: float = np.nan                                   # R^2 of the L(w0, wa) fit
+
+    @property
+    def template(self):
+        return GlobalTemplate({'m': (self.A_fit.m, self.A_fit.m_err), 'y0': (self.A_fit.y0, self.A_fit.y0_err)},
+                              {'m': (self.s_fit.m, self.s_fit.m_err),
+                               'y0': (self.s_fit.y0, self.s_fit.y0_err)},
+                              self.L_coeffs, next(iter(self.sets.values())).parametrization)
+
+    def L_model(self, w0, wa):
+        return self.L_coeffs['l1'][0] * (1 + w0) + self.L_coeffs['l2'][0] * wa
+
+    def spectrum_errors(self):
+        """{(w0, wa): mean relative error of the individual spectrum fits}."""
+        return {key: np.nanmean([f.err for f in fits.values()]) for key, fits in self.spectrum_fits.items()}
+
+    def template_errors(self, k_min=None, k_max=None):
+        """{(w0, wa): mean relative error of the global template}."""
+        template = self.template
+        return {key: np.nanmean(list(template.errors(spectra, k_min, k_max).values()))
+                for key, spectra in self.sets.items()}
+
+
+def fit_global_template(sets, k_min=None, k_max=None, method='leastsq', verbose=True):
+    """Fit the tanh_kB_L model on every spectrum of every background and build a GlobalTemplate.
+
+    A and s: weighted linear fits in cB using the spectra of all backgrounds at once (degenerate
+    spectrum fits have huge errors, so they barely weigh). L: mean over the spectra of each
+    background, then L = l1 (1 + w0) + l2 wa by least squares.
+    """
+    gf = GlobalFit(sets)
+    for key, spectra in sets.items():
+        gf.spectrum_fits[key] = {}
+        for ck, cb in spectra.pk_mg:
+            try:
+                gf.spectrum_fits[key][(ck, cb)] = fit_spectrum(spectra, ck, cb, 'tanh_kB_L', k_min, k_max, method)
+            except Exception as e:
+                gf.failed[(*key, ck, cb)] = str(e)
+                if verbose:
+                    print(f"Spectrum fit failed for w0={key[0]:.3g}, wa={key[1]:.3g}, ck={ck:.3g}, cb={cb:.3g}: {e}")
+
+    fits = [f for bg_fits in gf.spectrum_fits.values() for f in bg_fits.values()]
+    cbs = [f.cb for f in fits]
+    gf.A_fit = linear_fit(cbs, [f.params['A'][0] for f in fits], [f.params['A'][1] for f in fits])
+    gf.s_fit = linear_fit(cbs, [f.params['s'][0] for f in fits], [f.params['s'][1] for f in fits])
+
+    for key, bg_fits in gf.spectrum_fits.items():
+        Ls = [f.params['L'] for f in bg_fits.values()]
+        gf.L_means[key] = mean_fit([f.cb for f in bg_fits.values()], [v for v, _ in Ls], [e for _, e in Ls])
+
+    keys = list(gf.L_means)
+    X = np.array([[1 + w0, wa] for w0, wa in keys])
+    y = np.array([gf.L_means[key].value for key in keys])
+    lam, *_ = np.linalg.lstsq(X, y, rcond=None)
+    res = y - X @ lam
+    dof = len(y) - 2
+    cov = np.sum(res**2) / dof * np.linalg.inv(X.T @ X) if dof > 0 else np.full((2, 2), np.nan)
+    gf.L_coeffs = {'l1': (lam[0], np.sqrt(cov[0, 0])), 'l2': (lam[1], np.sqrt(cov[1, 1]))}
+    gf.L_r2 = r_squared(y, X @ lam)
+    return gf
