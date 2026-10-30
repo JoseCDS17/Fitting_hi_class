@@ -13,15 +13,15 @@ Units everywhere: `k`, `kB`, `kJ` in **h/Mpc**, `P(k)` in **(Mpc/h)³**.
 
 The deviation at $z=0$ is a step in $\log_{10} k$ located at the braiding scale (model `tanh_kB_L`):
 
-$$\frac{P_{MG}}{P_{GR}} - 1 = L + A\left(\tanh\left[2\log_{10}\frac{s\,k}{k_B}\right] + 1\right)$$
-
+$$\frac{P_{MG}}{P_{GR}} - 1 = L + A\left(\tanh\left[2\log_{10}\frac{s \, k}{k_B}\right] + 1\right)$$
+ 
 - $L$ is the deviation at large scales ($k \ll k_B$). It depends only on the background and vanishes in ΛCDM.
 - $2A$ is the height of the step and $k_B/s$ its position. Both depend on $c_B$.
 - $c_K$ enters only through $k_B$.
 
 Six coefficients cover every background:
 
-$$A = m_A\,c_B + y_{0,A}, \qquad s = m_s\,c_B + y_{0,s}, \qquad L = \ell_1 (1 + w_0) + \ell_2\, w_a$$
+$$A = m_A \, c_B + y_{0,A}, \qquad s = m_s \, c_B + y_{0,s}, \qquad L = \ell_1 (1 + w_0) + \ell_2 \, w_a$$
 
 | Coefficient | $m_A$ | $y_{0,A}$ | $m_s$ | $y_{0,s}$ | $\ell_1$ | $\ell_2$ |
 |---|---|---|---|---|---|---|
@@ -70,19 +70,19 @@ dependence:
 
 | `parametrization` | $\alpha_K$ | $\alpha_B$ |
 |---|---|---|
-| `propto_omega` | $c_K\,\Omega_{DE}(a)$ | $c_B\,\Omega_{DE}(a)$ |
-| `dust` | $c_K\,a^3$ | $c_B\,a^3$ |
+| `propto_omega` | $c_K \, \Omega_{DE}(a)$ | $c_B \, \Omega_{DE}(a)$ |
+| `dust` | $c_K \, a^3$ | $c_B \, a^3$ |
 
 The background is $w_0w_a$. $P_{GR}$ comes from a GR run with a $w_0w_a$ fluid of the same $(w_0, w_a)$, so the
 deviation isolates the modified perturbations. The base cosmology is in `hiclass_tools/config.py`
-($100\,\theta_s = 1.04109$, $\omega_b = 0.02237$, $\omega_{cdm} = 0.1200$, $A_s = 2.1\times10^{-9}$, $n_s = 0.9649$).
+($100 \, \theta_s = 1.04109$, $\omega_b = 0.02237$, $\omega_{cdm} = 0.1200$, $A_s = 2.1\times10^{-9}$, $n_s = 0.9649$).
 With $\theta_s$ fixed, $\Omega_{m,0}$ changes with the background and is derived by CLASS.
 
 The characteristic scales are computed analytically in `hiclass_tools/horndeski.py`, with
 $D = \alpha_K + \tfrac{3}{2}\alpha_B^2$:
 
-$$k_B = \sqrt{\frac{D}{\alpha_B^2}\,\Omega_{DE}\,(1 - w_{DE}) + \frac{9}{2}\,\Omega_m}\;\frac{aH}{c},
-\qquad k_J = \frac{aH}{c\,c_s}$$
+$$k_B = \sqrt{\frac{D}{\alpha_B^2} \, \Omega_{DE} \, (1 - w_{DE}) + \frac{9}{2} \, \Omega_m}\;\frac{aH}{c},
+\qquad k_J = \frac{aH}{c \, c_s}$$
 
 For $c_K \gg 1$ both scales grow as $\sqrt{c_K}$, so $k_B/\sqrt{c_K}$ and $k_J/\sqrt{c_K}$ depend only on $c_B$
 and on the background (see `notebooks/range_application/scales_w0wa.ipynb`).
@@ -185,7 +185,7 @@ gfit.template.save('fit_DE_grid_global')            # data/templates/fit_DE_grid
 **Per background**, `fit_template`, for one `SpectraSet`:
 
 1. Fit each $(c_K, c_B)$ spectrum with a template model, giving its three parameters.
-2. For each $c_K$, fit each parameter linearly in $c_B$: $p = m(c_K)\,c_B + y_0(c_K)$.
+2. For each $c_K$, fit each parameter linearly in $c_B$: $p = m(c_K) \, c_B + y_0(c_K)$.
 3. Average $m$ and $y_0$ over $c_K$ (simple mean, error = scatter$/\sqrt{N}$).
 
 **Global**, `fit_global_template`, for many backgrounds (model `tanh_kB_L` only):
@@ -196,9 +196,9 @@ gfit.template.save('fit_DE_grid_global')            # data/templates/fit_DE_grid
 
 | Model | Form | Status |
 |---|---|---|
-| `tanh_kBkJ` | $a \tanh\left[s\,\frac{\log_{10}(k/\sqrt{k_B k_J})}{\log_{10}(k_B/k_J)}\right] + b$ | First version, needs $k_B > k_J$ |
-| `tanh_kB` | $a \tanh\left[2\log_{10}(s\,k/k_B)\right] + b$ | Per-background fits |
-| `tanh_kB_L` | $L + A\left(\tanh\left[2\log_{10}(s\,k/k_B)\right] + 1\right)$ | Current. Same shape as `tanh_kB`, with $a = A$ and $b = L + A$ |
+| `tanh_kBkJ` | $a \tanh\left[s \, \frac{\log_{10}(k/\sqrt{k_B k_J})}{\log_{10}(k_B/k_J)}\right] + b$ | First version, needs $k_B > k_J$ |
+| `tanh_kB` | $a \tanh\left[2\log_{10}(s \, k/k_B)\right] + b$ | Per-background fits |
+| `tanh_kB_L` | $L + A\left(\tanh\left[2\log_{10}(s \, k/k_B)\right] + 1\right)$ | Current. Same shape as `tanh_kB`, with $a = A$ and $b = L + A$ |
 
 To add a model, write its function and add a `TemplateModel` entry to `MODELS` in `hiclass_tools/fitting.py`.
 
