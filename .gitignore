@@ -9,3 +9,6 @@ hiclass_env/
 __pycache__/
 *.egg-info/
 .ipynb_checkpoints/
+
+# Private LaTeX draft, kept only locally
+draft/

@@ -43,8 +43,18 @@ class Horndeski:
             return self.background.Omega_DE(N)
         return np.exp(3 * N)
 
+    def _dlog_time_dependence(self, N):
+        """d ln(time dependence) / dN."""
+        if self.parametrization == 'propto_omega':
+            return 3 * (self.background.w_eff(N) - self.background.wDE(N))
+        return 3
+
     def alpha_b(self, N=0.0):
         return self.cb * self._time_dependence(N)
+
+    def dalpha_b(self, N=0.0):
+        """d alpha_b / dN."""
+        return self.alpha_b(N) * self._dlog_time_dependence(N)
 
     def alpha_k(self, N=0.0):
         return self.ck * self._time_dependence(N)
@@ -57,8 +67,8 @@ class Horndeski:
         bg = self.background
         ab = self.alpha_b(N)
         w_eff = bg.w_eff(N)
-        return 1 / self.D(N) * (3 * (1 + w_eff) - (1 + W_M) / bg.H(N)**2 * bg.rho_m(N)
-                                + (5/2 + 3/2 * w_eff) * ab - ab**2 / 2)
+        return 1 / self.D(N) * ((2 - ab) * (3/2 * (1 + w_eff) + ab / 2) - (1 + W_M) / bg.H(N)**2 * bg.rho_m(N)
+                                + self.dalpha_b(N))
 
     # Characteristic scales [h/Mpc]
     def kJ(self, N=0.0):
