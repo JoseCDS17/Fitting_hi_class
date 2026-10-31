@@ -18,18 +18,19 @@ import numpy as np
 from hiclass_tools.spectra import SpectraSet, spectra_path
 
 # ===================== Configuration =====================
-NAME = 'fit_DE_grid'
+NAME = 'fit_DE_grid_wide'
 PARAMETRIZATION = 'propto_omega'      # 'propto_omega' | 'dust'
 
-# Grid of (w0, wa), keeping w0 + wa <= 0
-BACKGROUNDS = [(w0, wa) for w0 in np.linspace(-1, -0.7, 10) for wa in np.linspace(-1, 0, 10)
+# DESI DR2 Results IV (arXiv:2607.27410), DESI+CMB+DES-Dovekie
+# BACKGROUNDS = [(-0.82, -0.65)]
+BACKGROUNDS = [(w0, wa) for w0 in np.linspace(-1, -0.6, 21) for wa in np.linspace(-1.5, 0, 31)
                if w0 + wa <= 0]
 
-k = np.logspace(-3, 1, 50)            # h/Mpc
+k = np.logspace(-3, 1, 50)           # h/Mpc
 cK = np.logspace(3, 6, 10)
 cB = np.linspace(0.5, 1.5, 10)
 
-WORKERS = 4                        # parallel processes (None: all cores)
+WORKERS = 6                        # parallel processes (None: all cores)
 # =========================================================
 
 

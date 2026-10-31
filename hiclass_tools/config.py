@@ -27,5 +27,11 @@ BASE_COSMO = {
     'n_s': 0.9649,
 }
 
+''' Calibration of Background.from_theta_s. Valid only for BASE_COSMO: update H_LCDM (h from CLASS with
+    w0 = -1, wa = 0) if it changes '''
+H_LCDM = 0.6759982
+OMEGA_R_H2 = 2.473e-5 * (1 + 0.2271 * 3.044)   # photons + massless neutrinos (T_cmb = 2.7255 K, Neff = 3.044)
+Z_REC = 1088.78                                # redshift of recombination
+
 ''' Horndeski parametrizations available '''
 PARAMETRIZATIONS = ('propto_omega', 'dust')

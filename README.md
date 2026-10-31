@@ -130,12 +130,13 @@ template = GlobalTemplate(
     parametrization='propto_omega',
 )
 
-background = Background(w0=-0.85, wa=-0.56, Omega_m0=0.3124)
+background = Background(w0=-0.82, wa=-0.65, Omega_m0=0.3143)
 k = np.logspace(-3, 1, 200)                                    # h/Mpc
 deviation = template(k, ck=1e4, cb=1.0, background=background)  # P_MG/P_GR - 1
 ```
 
-`Background.from_class(w0, wa)` gets $\Omega_{m,0}$ from CLASS with $\theta_s$ fixed. After running
+`Background.from_theta_s(w0, wa)` gets $\Omega_{m,0}$ analytically for the base cosmology, without CLASS, and
+`Background.from_class(w0, wa)` gets it from CLASS for any cosmology. After running
 `fit_global.ipynb`, `GlobalTemplate.load('fit_DE_grid_global')` loads the template with full precision.
 
 ### Compute spectra (slow, once)
@@ -152,16 +153,16 @@ The result goes to `data/spectra/<NAME>.pkl`, or to one file per background in `
 backgrounds are given. Backgrounds already saved are skipped, so an interrupted grid resumes by relaunching the
 script. Each file stores every parameter used.
 
-The notebooks expect these datasets. The script is currently configured for `fit_DE_grid`.
+The notebooks expect these datasets. The script is currently configured for `fit_w0wa`.
 
 | `NAME` | Backgrounds $(w_0, w_a)$ | $c_K$ | $c_B$ | $k$ [h/Mpc] |
 |---|---|---|---|---|
 | `fit_LCDM` | $(-1, 0)$ | 10 in $[10^3, 10^6]$ | 10 in $[0.5, 1.5]$ | 100 in $[10^{-3}, 10]$ |
-| `fit_w0wa` | $(-0.85, -0.56)$ | 10 in $[10^3, 10^6]$ | 10 in $[0.5, 1.5]$ | 100 in $[10^{-3}, 10]$ |
+| `fit_w0wa` | $(-0.82, -0.65)$ | 10 in $[10^3, 10^6]$ | 10 in $[0.5, 1.5]$ | 100 in $[10^{-3}, 10]$ |
 | `fit_DE_grid` | 10×10 grid, $w_0 \in [-1, -0.7]$, $w_a \in [-1, 0]$ | 10 in $[10^3, 10^6]$ | 10 in $[0.5, 1.5]$ | 50 in $[10^{-3}, 10]$ |
 | `range_DE_grid` | 5×5 grid, $w_0 \in [-1, -0.8]$, $w_a \in [-1, 0]$ | 10 in $[10^3, 10^6]$ | 10 in $[0.5, 1.5]$ | 50 in $[10^{-3}, 10]$ |
-| `range_LCDM_ckhigh`, `range_w0wa_ckhigh` | $(-1, 0)$, $(-0.85, -0.56)$ | 6 in $[10^2, 10^7]$ | 5 in $[0.5, 1.5]$ | 100 in $[3\times10^{-4}, 10]$ |
-| `range_LCDM_cklow`, `range_w0wa_cklow` | $(-1, 0)$, $(-0.85, -0.56)$ | 6 in $[0.1, 20]$ | 5 in $[0.5, 1.5]$ | 100 in $[3\times10^{-5}, 10^{-2}]$ |
+| `range_LCDM_ckhigh`, `range_w0wa_ckhigh` | $(-1, 0)$, $(-0.82, -0.65)$ | 6 in $[10^2, 10^7]$ | 5 in $[0.5, 1.5]$ | 100 in $[3\times10^{-4}, 10]$ |
+| `range_LCDM_cklow`, `range_w0wa_cklow` | $(-1, 0)$, $(-0.82, -0.65)$ | 6 in $[0.1, 20]$ | 5 in $[0.5, 1.5]$ | 100 in $[3\times10^{-5}, 10^{-2}]$ |
 
 ### Analyse and fit (fast, as often as needed)
 

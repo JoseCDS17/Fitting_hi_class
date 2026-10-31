@@ -7,8 +7,25 @@ import concurrent.futures
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.integrate import quad
+from scipy.optimize import brentq
+
+from .config import BASE_COSMO, H_LCDM, OMEGA_R_H2, Z_REC
 
 W_M = 0  # matter equation of state
+OMEGA_M_H2 = BASE_COSMO['omega_b'] + BASE_COSMO['omega_cdm']
+
+
+def _distance_to_recombination(h, w0, wa):
+    """Comoving distance to Z_REC in units of c / (100 km/s/Mpc)."""
+    omega_de_h2 = h**2 - OMEGA_M_H2 - OMEGA_R_H2
+
+    def integrand(x):        # x = ln(1 + z)
+        one_plus_z = np.exp(x)
+        de = np.exp(3 * (1 + w0 + wa) * x - 3 * wa * (1 - 1 / one_plus_z))
+        return one_plus_z / np.sqrt(OMEGA_M_H2 * one_plus_z**3 + OMEGA_R_H2 * one_plus_z**4 + omega_de_h2 * de)
+
+    return quad(integrand, 0, np.log(1 + Z_REC), epsabs=1e-10, epsrel=1e-10, limit=200)[0]
 
 
 @dataclass(frozen=True)
@@ -35,6 +52,14 @@ class Background:
         finally:
             c.struct_cleanup()
             c.empty()
+
+    @classmethod
+    def from_theta_s(cls, w0, wa):
+        """Build the background without CLASS: with the early universe fixed, theta_s fixed means the
+        distance to recombination of the LCDM calibration, which gives h and Omega_m0 = omega_m / h^2."""
+        target = _distance_to_recombination(H_LCDM, -1.0, 0.0)
+        h = brentq(lambda h: _distance_to_recombination(h, w0, wa) - target, 0.4, 1.1)
+        return cls(w0=w0, wa=wa, Omega_m0=OMEGA_M_H2 / h**2)
 
     @property
     def Omega_DE0(self):
