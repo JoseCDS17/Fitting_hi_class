@@ -136,6 +136,8 @@ k = np.logspace(-3, 1, 200)                                     # h/Mpc
 deviation = template(k, ck=1e4, cb=1.0, w0=-0.82, wa=-0.65)     # P_MG/P_GR - 1
 ```
 
+`template/examples/template_examples.ipynb` has worked examples.
+
 The coefficients are versioned in `template/horndeski_template/coefficients.json`. To publish a new fit, call
 `template.export()` on the `GlobalTemplate` obtained in `fit_global.ipynb` and commit the file. After running
 that notebook, `hiclass_tools.GlobalTemplate.load('fit_DE_grid_global')` loads the saved template.
@@ -228,6 +230,8 @@ template/                 light package: evaluate the template without hi_class 
     background.py     Background(w0, wa, Omega_m0): H, Omega_m, Omega_DE, w_eff...
     horndeski.py      Horndeski(ck, cb, background, parametrization): alphas, cs2, kJ, kB
     template.py       GlobalTemplate: the analytic template
+  examples/
+    template_examples.ipynb   how to use the template
 hiclass_tools/            full package: derives the template with hi_class (uses horndeski_template)
   config.py         data path, base cosmology for every CLASS run
   background.py     Omega_m0 from CLASS
