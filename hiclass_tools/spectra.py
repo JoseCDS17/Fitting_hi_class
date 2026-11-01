@@ -11,12 +11,24 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from .background import Background
+from horndeski_template import Background, Horndeski
+from horndeski_template.constants import PARAMETRIZATIONS
+
 from .config import BASE_COSMO, DATA_DIR
-from .horndeski import Horndeski, gravity_params
 
 
 ''' CLASS parameters '''
+def gravity_params(ck, cb, parametrization='propto_omega'):
+    """hi_class 'gravity_model' and 'parameters_smg' entries for (ck, cb)."""
+    if parametrization == 'propto_omega':
+        return {'gravity_model': 'propto_omega',
+                'parameters_smg': f'{ck}, {cb}, 0., 0., 1.'}
+    if parametrization == 'dust':
+        return {'gravity_model': 'eft_alphas_power_law',
+                'parameters_smg': f'0., {ck}, {cb}, 0., 0., 3., 3., 0.'}
+    raise ValueError(f"Unknown parametrization '{parametrization}'. Options: {PARAMETRIZATIONS}")
+
+
 def class_params_gr(w0=-1.0, wa=0.0, cosmo=None):
     """GR run with a w0wa fluid as dark energy."""
     return {**(cosmo or BASE_COSMO),

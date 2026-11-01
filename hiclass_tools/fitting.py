@@ -12,9 +12,11 @@ from typing import Callable
 import numpy as np
 from lmfit import Model
 
+from horndeski_template import Background, Horndeski
+from horndeski_template import GlobalTemplate as AnalyticGlobalTemplate
+from horndeski_template.template import tanh_kB_L
+
 from .config import DATA_DIR
-from .horndeski import Horndeski
-from .background import Background
 
 
 ''' Template models '''
@@ -28,11 +30,6 @@ def tanh_kBkJ(k, kB, kJ, a, b, s):
 def tanh_kB(k, kB, kJ, a, b, s):
     """Transition centred at kB / s (kJ unused)."""
     return a * np.tanh(2 * np.log10(s * k / kB)) + b
-
-
-def tanh_kB_L(k, kB, kJ, A, L, s):
-    """tanh_kB written as large-scale level L (k << kB) plus a step of height 2A (a = A, b = L + A)."""
-    return L + A * (np.tanh(2 * np.log10(s * k / kB)) + 1)
 
 
 @dataclass(frozen=True)
@@ -337,38 +334,16 @@ def fit_backgrounds(sets, verbose=False, **fit_kwargs):
 
 
 ''' Global template over backgrounds (model tanh_kB_L) '''
-@dataclass
-class GlobalTemplate:
-    """y = L + A [tanh(2 log10(s k / kB)) + 1] with 6 coefficients valid for any (w0, wa):
-        A = m_A cB + y0_A,   s = m_s cB + y0_s,   L = l1 (1 + w0) + l2 wa  (L = 0 in LCDM)
-    """
-    A: dict                   # {'m': (value, error), 'y0': (value, error)}
-    s: dict                   # {'m': (value, error), 'y0': (value, error)}
-    L: dict                   # {'l1': (value, error), 'l2': (value, error)}
-    parametrization: str
-    model_name: str = 'tanh_kB_L'
+class GlobalTemplate(AnalyticGlobalTemplate):
+    """horndeski_template.GlobalTemplate plus the comparison against spectra and save/load."""
 
     @property
     def model(self):
         return MODELS[self.model_name]
 
-    def params(self, cb, background):
-        """Template parameters (A, L, s) at cb for a background."""
-        return {'A': self.A['m'][0] * cb + self.A['y0'][0],
-                'L': self.L['l1'][0] * (1 + background.w0) + self.L['l2'][0] * background.wa,
-                's': self.s['m'][0] * cb + self.s['y0'][0]}
-
-    def __call__(self, k, ck, cb, background):
-        """Predicted P_MG/P_GR - 1 at k [h/Mpc] for (ck, cb) on a background."""
-        params = self.params(cb, background)
-        if params['s'] <= 0:
-            raise ValueError(f"s must be positive, but s={params['s']:.4g} for cb={cb}")
-        kB = Horndeski(ck, cb, background, self.parametrization).kB()
-        return self.model(np.asarray(k), kB, None, **params)
-
     def errors(self, spectra, k_min=None, k_max=None):
         """{(ck, cb): relative error} against a SpectraSet in [k_min, k_max] (default: full k range)."""
-        return template_errors(self, spectra, k_min, k_max)
+        return template_errors(self.evaluate, spectra, k_min, k_max)
 
     def save(self, name):
         (DATA_DIR / 'templates').mkdir(parents=True, exist_ok=True)

@@ -9,18 +9,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .background import Background, W_M
-from .config import H0_OVER_C, PARAMETRIZATIONS
-
-
-def gravity_params(ck, cb, parametrization='propto_omega'):
-    """hi_class 'gravity_model' and 'parameters_smg' entries for (ck, cb)."""
-    if parametrization == 'propto_omega':
-        return {'gravity_model': 'propto_omega',
-                'parameters_smg': f'{ck}, {cb}, 0., 0., 1.'}
-    if parametrization == 'dust':
-        return {'gravity_model': 'eft_alphas_power_law',
-                'parameters_smg': f'0., {ck}, {cb}, 0., 0., 3., 3., 0.'}
-    raise ValueError(f"Unknown parametrization '{parametrization}'. Options: {PARAMETRIZATIONS}")
+from .constants import H0_OVER_C, PARAMETRIZATIONS
 
 
 @dataclass(frozen=True)
@@ -33,9 +22,6 @@ class Horndeski:
     def __post_init__(self):
         if self.parametrization not in PARAMETRIZATIONS:
             raise ValueError(f"Unknown parametrization '{self.parametrization}'. Options: {PARAMETRIZATIONS}")
-
-    def class_params(self):
-        return gravity_params(self.ck, self.cb, self.parametrization)
 
     # Horndeski variables
     def _time_dependence(self, N):

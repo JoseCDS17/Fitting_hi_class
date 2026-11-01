@@ -105,8 +105,14 @@ cd hi_class_public
 make clean && make -j
 cd ..
 
-# Install this package (editable)
-pip install -e .
+# Install both packages (editable)
+pip install -e ./template -e .
+```
+
+To use only the template, without hi_class, the light package is enough (it needs only NumPy and SciPy):
+
+```bash
+pip install "git+https://github.com/JoseCDS17/Fitting_hi_class.git#subdirectory=template"
 ```
 
 The working environment uses Python 3.11, NumPy 1.26.4, Cython 0.29.36 and lmfit 1.3.4. See the hi_class/CLASS
@@ -116,28 +122,23 @@ README for compilation issues.
 
 ### Evaluate the template
 
-`data/` is not versioned, so a fresh clone builds the template from the coefficients above. No hi_class run is
-needed if $\Omega_{m,0}$ is known:
+You only choose the gravity model and $(w_0, w_a)$: the rest of the cosmology is fixed to the base cosmology of
+the fit (see [Physical setup](#physical-setup)), and the coefficients come with the package. This needs only
+`horndeski_template`, not hi_class:
 
 ```python
 import numpy as np
-from hiclass_tools import Background, GlobalTemplate
+from horndeski_template import GlobalTemplate
 
-template = GlobalTemplate(
-    A={'m': (0.02526, 0.00009), 'y0': (0.00020, 0.00009)},
-    s={'m': (-0.42524, 0.00364), 'y0': (1.39114, 0.00453)},
-    L={'l1': (0.04142, 0.00216), 'l2': (0.02154, 0.00065)},
-    parametrization='propto_omega',
-)
+template = GlobalTemplate.default()
 
-background = Background(w0=-0.82, wa=-0.65, Omega_m0=0.3143)
-k = np.logspace(-3, 1, 200)                                    # h/Mpc
-deviation = template(k, ck=1e4, cb=1.0, background=background)  # P_MG/P_GR - 1
+k = np.logspace(-3, 1, 200)                                     # h/Mpc
+deviation = template(k, ck=1e4, cb=1.0, w0=-0.82, wa=-0.65)     # P_MG/P_GR - 1
 ```
 
-`Background.from_theta_s(w0, wa)` gets $\Omega_{m,0}$ analytically for the base cosmology, without CLASS, and
-`Background.from_class(w0, wa)` gets it from CLASS for any cosmology. After running
-`fit_global.ipynb`, `GlobalTemplate.load('fit_DE_grid_global')` loads the template with full precision.
+The coefficients are versioned in `template/horndeski_template/coefficients.json`. To publish a new fit, call
+`template.export()` on the `GlobalTemplate` obtained in `fit_global.ipynb` and commit the file. After running
+that notebook, `hiclass_tools.GlobalTemplate.load('fit_DE_grid_global')` loads the saved template.
 
 ### Compute spectra (slow, once)
 
@@ -219,12 +220,19 @@ Figures are written out in the notebooks. `hiclass_tools/plotting.py` only provi
 ## Structure
 
 ```
-hiclass_tools/      Python package
-  config.py         data path, constants, base cosmology for every CLASS run
-  background.py     Background(w0, wa, Omega_m0): H, Omega_m, Omega_DE, w_eff...
-  horndeski.py      Horndeski(ck, cb, background, parametrization): alphas, cs2, kJ, kB
+template/                 light package: evaluate the template without hi_class (NumPy, SciPy)
+  pyproject.toml
+  horndeski_template/
+    coefficients.json the coefficients of the published fit
+    constants.py      constants, base physical densities, from_theta_s calibration
+    background.py     Background(w0, wa, Omega_m0): H, Omega_m, Omega_DE, w_eff...
+    horndeski.py      Horndeski(ck, cb, background, parametrization): alphas, cs2, kJ, kB
+    template.py       GlobalTemplate: the analytic template
+hiclass_tools/            full package: derives the template with hi_class (uses horndeski_template)
+  config.py         data path, base cosmology for every CLASS run
+  background.py     Omega_m0 from CLASS
   spectra.py        SpectraSet: runs hi_class (GR + MG grid in parallel), save/load
-  fitting.py        template models, fitting pipelines, Template and GlobalTemplate
+  fitting.py        template models, fitting pipelines, Template and GlobalTemplate with save/load
   plotting.py       matplotlib style and colour scales
 scripts/
   compute_spectra.py
